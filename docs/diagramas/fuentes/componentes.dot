@@ -1,0 +1,15 @@
+digraph G {
+  rankdir=TB; fontname="Helvetica"; node [shape=component, style=filled, fillcolor="#FFF2CC", fontname="Helvetica", fontsize=11]; edge [fontname="Helvetica", fontsize=9];
+  labelloc=t; label="Figura 2.5. Diagrama de componentes"; fontsize=14;
+  subgraph cluster_c { label="Cliente web (React)"; style=filled; fillcolor="#EAF1FB";
+    ui1 [label="Módulo Seguridad\n(login, usuarios)"]; ui2 [label="Módulo Inventario\n(productos, compras)"]; ui3 [label="Módulo Ventas y pedidos"]; ui4 [label="Módulo Reportes"]; }
+  subgraph cluster_s { label="API REST (Node.js + Express)"; style=filled; fillcolor="#F3F3F3";
+    mw [label="Middleware\n(JWT, roles, validación, errores)", fillcolor="#F4CCCC"];
+    ctrl [label="Rutas y controladores"];
+    svc [label="Servicios de dominio\n(Seguridad, Inventario, Ventas, Reportes)", fillcolor="#D9EAD3"];
+    repo [label="Repositorios\n(consultas parametrizadas)", fillcolor="#D9EAD3"];
+    bit [label="Bitácora", fillcolor="#D9EAD3"]; }
+  db [shape=cylinder, label="MySQL 8", fillcolor="#CFE2F3"];
+  {ui1 ui2 ui3 ui4} -> mw [label="HTTPS / JSON"];
+  mw -> ctrl -> svc -> repo -> db; svc -> bit -> repo;
+}

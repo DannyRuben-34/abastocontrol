@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor V as Vendedor
+    participant UI as Interfaz React
+    participant MW as Middleware (JWT y rol)
+    participant C as VentasController
+    participant S as VentasService
+    participant R as Repositorios
+    participant DB as MySQL
+    V->>UI: Agrega productos y elige medio de pago
+    UI->>MW: POST /api/ventas (líneas, medioPago, clienteId)
+    MW->>MW: Valida token y rol
+    MW->>C: Solicitud autorizada
+    C->>C: Valida estructura de los datos
+    C->>S: registrarVenta(datos, usuario)
+    S->>DB: BEGIN (transacción)
+    loop por cada línea
+        S->>R: obtenerProducto(id) FOR UPDATE
+        R->>DB: SELECT stock, precio
+        DB-->>S: producto
+        alt cantidad mayor que el stock
+            S->>DB: ROLLBACK
+            S-->>C: Error de stock insuficiente
+            C-->>UI: 409 con el stock disponible
+        end
+    end
+    S->>R: guardarVenta y detalles
+    R->>DB: INSERT venta, detalle_venta
+    S->>R: descontarStock y registrar bitácora
+    R->>DB: UPDATE producto, INSERT bitacora
+    S->>DB: COMMIT
+    S-->>C: venta con total y líneas
+    C-->>UI: 201 con datos del ticket
+    UI-->>V: Muestra el ticket

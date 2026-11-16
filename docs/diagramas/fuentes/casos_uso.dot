@@ -1,0 +1,30 @@
+digraph G {
+  rankdir=LR; fontname="Helvetica"; node [fontname="Helvetica", fontsize=11]; edge [fontname="Helvetica", fontsize=9];
+  labelloc=t; label="Figura 2.1. Diagrama de casos de uso de AbastoControl"; fontsize=14;
+  Vendedor [shape=box, style="rounded,filled", fillcolor="#E8F0FE", label="«actor»\nVendedor"];
+  Admin [shape=box, style="rounded,filled", fillcolor="#FDE8E8", label="«actor»\nAdministrador"];
+  subgraph cluster_m1 { label="M1 Seguridad y usuarios"; style=dashed;
+    cu01 [shape=ellipse,label="CU-01 Iniciar sesión"];
+    cu02 [shape=ellipse,label="CU-02 Gestionar usuarios y roles"];
+    cu15 [shape=ellipse,label="CU-15 Consultar bitácora"]; }
+  subgraph cluster_m2 { label="M2 Inventario"; style=dashed;
+    cu03 [shape=ellipse,label="CU-03 Gestionar productos"];
+    cu04 [shape=ellipse,label="CU-04 Registrar compra"];
+    cu05 [shape=ellipse,label="CU-05 Gestionar proveedores"];
+    cu06 [shape=ellipse,label="CU-06 Consultar alertas de stock"]; }
+  subgraph cluster_m3 { label="M3 Ventas y pedidos"; style=dashed;
+    cu07 [shape=ellipse,label="CU-07 Registrar venta"];
+    cu08 [shape=ellipse,label="CU-08 Gestionar pedidos"];
+    cu09 [shape=ellipse,label="CU-09 Gestionar clientes y fiado"];
+    cu10 [shape=ellipse,label="CU-10 Emitir ticket"];
+    cu11 [shape=ellipse,label="CU-11 Cerrar caja"]; }
+  subgraph cluster_m4 { label="M4 Reportes"; style=dashed;
+    cu12 [shape=ellipse,label="CU-12 Reporte de ventas"];
+    cu13 [shape=ellipse,label="CU-13 Reporte de inventario"];
+    cu14 [shape=ellipse,label="CU-14 Exportar reporte"]; }
+  Admin -> Vendedor [arrowhead=empty, label="hereda"];
+  Vendedor -> {cu01 cu03 cu04 cu06 cu07 cu08 cu09 cu11 cu12};
+  Admin -> {cu02 cu05 cu13 cu14 cu15};
+  cu07 -> cu10 [style=dashed, label="«include»"];
+  cu12 -> cu14 [style=dashed, label="«extend»", dir=back];
+}

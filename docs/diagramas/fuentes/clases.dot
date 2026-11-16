@@ -1,0 +1,29 @@
+digraph G {
+  rankdir=LR; fontname="Helvetica"; node [shape=plain, fontname="Helvetica", fontsize=10]; edge [fontname="Helvetica", fontsize=9, arrowhead=none];
+  labelloc=t; label="Figura 2.2. Diagrama de clases del dominio"; fontsize=14;
+  Usuario [label=<<table border="1" cellborder="0" cellspacing="0" bgcolor="#FFFFFF"><tr><td bgcolor="#DCE8FA"><b>Usuario</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- nombre: string<br align="left"/>- usuario: string<br align="left"/>- hashContraseña: string<br align="left"/>- rol: Rol<br align="left"/>- activo: bool<br align="left"/>- intentosFallidos: int<br align="left"/></td></tr><hr/><tr><td align="left">+ iniciarSesion()<br align="left"/>+ cerrarSesion()<br align="left"/></td></tr></table>>];
+  Producto [label=<<table border="1" cellborder="0" cellspacing="0" bgcolor="#FFFFFF"><tr><td bgcolor="#DCE8FA"><b>Producto</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- codigo: string<br align="left"/>- nombre: string<br align="left"/>- precioVenta: decimal<br align="left"/>- costo: decimal<br align="left"/>- stock: int<br align="left"/>- stockMinimo: int<br align="left"/>- fechaVencimiento: date<br align="left"/>- activo: bool<br align="left"/></td></tr><hr/><tr><td align="left">+ descontarStock(n)<br align="left"/>+ aumentarStock(n)<br align="left"/>+ bajoMinimo(): bool<br align="left"/></td></tr></table>>];
+  Categoria [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Categoría</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- nombre: string<br align="left"/></td></tr></table>>];
+  Proveedor [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Proveedor</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- nombre: string<br align="left"/>- telefono: string<br align="left"/>- activo: bool<br align="left"/></td></tr></table>>];
+  Compra [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Compra</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- fecha: datetime<br align="left"/>- total: decimal<br align="left"/></td></tr></table>>];
+  DetalleCompra [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>DetalleCompra</b></td></tr><hr/><tr><td align="left">- cantidad: int<br align="left"/>- costoUnitario: decimal<br align="left"/></td></tr></table>>];
+  Cliente [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Cliente</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- nombre: string<br align="left"/>- telefono: string<br align="left"/>- consentimientoDatos: bool<br align="left"/>- saldoFiado: decimal<br align="left"/></td></tr></table>>];
+  Venta [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Venta</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- fecha: datetime<br align="left"/>- medioPago: MedioPago<br align="left"/>- total: decimal<br align="left"/>- estado: string<br align="left"/></td></tr><hr/><tr><td align="left">+ calcularTotal()<br align="left"/>+ anular()<br align="left"/></td></tr></table>>];
+  DetalleVenta [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>DetalleVenta</b></td></tr><hr/><tr><td align="left">- cantidad: int<br align="left"/>- precioUnitario: decimal<br align="left"/></td></tr></table>>];
+  Pedido [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Pedido</b></td></tr><hr/><tr><td align="left">- id: int<br align="left"/>- modalidad: recojo | reparto<br align="left"/>- estado: EstadoPedido<br align="left"/>- fechaCreacion: datetime<br align="left"/></td></tr><hr/><tr><td align="left">+ avanzar()<br align="left"/>+ cancelar()<br align="left"/></td></tr></table>>];
+  CierreCaja [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>CierreCaja</b></td></tr><hr/><tr><td align="left">- fecha: date<br align="left"/>- totalEfectivo: decimal<br align="left"/>- totalDigital: decimal<br align="left"/>- totalFiado: decimal<br align="left"/>- diferencia: decimal<br align="left"/></td></tr></table>>];
+  Bitacora [label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#DCE8FA"><b>Bitácora</b></td></tr><hr/><tr><td align="left">- fecha: datetime<br align="left"/>- accion: string<br align="left"/>- entidad: string<br align="left"/>- idEntidad: int<br align="left"/></td></tr></table>>];
+  Categoria -> Producto [headlabel="*", taillabel="1"];
+  Proveedor -> Compra [headlabel="*", taillabel="1"];
+  Compra -> DetalleCompra [headlabel="*", taillabel="1", arrowhead=diamond, dir=back];
+  DetalleCompra -> Producto [headlabel="1", taillabel="*"];
+  Cliente -> Venta [headlabel="*", taillabel="0..1"];
+  Venta -> DetalleVenta [headlabel="*", taillabel="1", arrowhead=diamond, dir=back];
+  DetalleVenta -> Producto [headlabel="1", taillabel="*"];
+  Cliente -> Pedido [headlabel="*", taillabel="1"];
+  Pedido -> Venta [headlabel="0..1", taillabel="*"];
+  Usuario -> Venta [headlabel="*", taillabel="1"];
+  Usuario -> Compra [headlabel="*", taillabel="1"];
+  Usuario -> CierreCaja [headlabel="*", taillabel="1"];
+  Usuario -> Bitacora [headlabel="*", taillabel="1"];
+}

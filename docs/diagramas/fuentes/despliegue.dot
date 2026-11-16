@@ -1,0 +1,10 @@
+digraph G {
+  rankdir=LR; fontname="Helvetica"; node [shape=box3d, style=filled, fontname="Helvetica", fontsize=11]; edge [fontname="Helvetica", fontsize=10];
+  labelloc=t; label="Figura 2.6. Diagrama de despliegue (laboratorio)"; fontsize=14;
+  nav [label="«dispositivo»\nPC del usuario\n\n«navegador»\nChrome / Edge / Firefox\n(aplicación React)", fillcolor="#EAF1FB"];
+  subgraph cluster_srv { label="«dispositivo» Equipo servidor del laboratorio"; style=dashed;
+    app [label="«entorno de ejecución»\nNode.js LTS\n\nAbastoControl API (Express)\nPuerto 3000", fillcolor="#D9EAD3"];
+    db [label="«sistema de base de datos»\nMySQL 8\n\nbase abastocontrol\nPuerto 3306 (solo local)", fillcolor="#CFE2F3"]; }
+  nav -> app [label="HTTPS (443 → 3000)"];
+  app -> db [label="conexión local\n(pool mysql2)"];
+}
