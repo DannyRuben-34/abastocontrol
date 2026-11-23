@@ -1,193 +1,161 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, guardarToken, obtenerToken } from './api.js';
 
-const soles = (n) => `S/ ${Number(n).toFixed(2)}`;
+const dinero = (valor) => `S/ ${Number(valor || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const hoyISO = () => { const f = new Date(); f.setMinutes(f.getMinutes() - f.getTimezoneOffset()); return f.toISOString().slice(0, 10); };
+const inicioMes = () => `${hoyISO().slice(0, 7)}-01`;
+const restarDias = (dias) => { const f = new Date(); f.setDate(f.getDate() - dias); f.setMinutes(f.getMinutes() - f.getTimezoneOffset()); return f.toISOString().slice(0, 10); };
+const fechaLegible = (dato) => { if (!dato) return '—'; const p = String(dato).slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dato; };
+const estados = { registrado: 'Registrado', en_preparacion: 'En preparación', listo: 'Listo', entregado: 'Entregado', cancelado: 'Cancelado' };
+
+function Icono({ nombre = 'caja', size = 19, className = '' }) {
+  const iconos = {
+    inicio: <><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></>,
+    tienda: <><path d="M3 10h18l-2-6H5z"/><path d="M5 10v10h14V10"/><path d="M9 20v-7h6v7"/><path d="M3 10c0 3 4 3 4 0 0 3 4 3 4 0 0 3 4 3 4 0 0 3 4 3 4 0"/></>,
+    caja: <><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 5 9-5M12 12v9"/></>,
+    ventas: <><path d="M3 5h2l2.2 11h12l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></>,
+    inventario: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></>,
+    pedidos: <><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6M9 18h4"/></>,
+    reportes: <><path d="M4 20V11M10 20V5M16 20v-8M22 20V8"/><path d="M2 20h22"/></>,
+    clientes: <><circle cx="9" cy="8" r="3"/><path d="M2 20c0-4 3-7 7-7s7 3 7 7"/><path d="M17 8h5M19.5 5.5v5"/></>,
+    proveedores: <><rect x="3" y="7" width="12" height="12" rx="1"/><path d="M15 11h4l3 4v4h-7M7 7V4h8v3"/><circle cx="8" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></>,
+    compras: <><path d="M4 8h16l-2 13H6zM9 9V6a3 3 0 0 1 6 0v3"/></>,
+    lupa: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></>,
+    campana: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></>,
+    flecha: <><path d="M5 12h14M13 6l6 6-6 6"/></>,
+    mas: <path d="M12 5v14M5 12h14"/>,
+    menos: <path d="M5 12h14"/>,
+    chevron: <path d="m9 18 6-6-6-6"/>,
+    abajo: <path d="m6 9 6 6 6-6"/>,
+    salir: <><path d="M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h5"/><path d="M16 17l5-5-5-5M21 12H9"/></>,
+    calendario: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></>,
+    recargar: <><path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 4v7h-7"/></>,
+    alerta: <><path d="M12 3 2 21h20L12 3z"/><path d="M12 9v5M12 18h.01"/></>,
+    check: <path d="m5 12 4 4L19 6"/>,
+    cerrar: <path d="M18 6 6 18M6 6l12 12"/>,
+    flechaArriba: <><path d="M12 20V4m-6 6 6-6 6 6"/></>,
+    archivo: <><path d="M6 3h9l4 4v14H6zM15 3v5h4M9 13h7M9 17h7"/></>,
+    descargar: <><path d="M12 3v12m-4-4 4 4 4-4M4 17v4h16v-4"/></>,
+    ojo: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>,
+    ojoOff: <><path d="M3 3l18 18M10 5.2A11 11 0 0 1 12 5c6 0 10 7 10 7a16 16 0 0 1-3 3.7M6 6.6C3.5 8.3 2 12 2 12s4 7 10 7c1 0 2-.2 3-.5"/></>,
+    imprimir: <><path d="M6 9V3h12v6M6 18H4V9h16v9h-2"/><path d="M6 15h12v6H6z"/></>,
+    editar: <><path d="m4 20 4-.8L20 7l-3-3L5 16zM15 6l3 3"/></>,
+    papelera: <><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6"/></>,
+    escudo: <><path d="M12 2 4 5v6c0 5 3 9 8 11 5-2 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/></>,
+    reloj: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></>,
+    menu: <path d="M3 6h18M3 12h18M3 18h18"/>,
+    grafico: <><path d="m3 16 6-6 4 3 8-9"/><path d="M16 4h5v5"/></>,
+    circulo: <circle cx="12" cy="12" r="8"/>,
+    vacio: <><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12h8"/></>,
+    volver: <path d="m15 18-6-6 6-6"/>,
+    usuario: <><circle cx="12" cy="8" r="4"/><path d="M4 21c0-5 3-8 8-8s8 3 8 8"/></>,
+    llave: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 15v2"/></>,
+  };
+  return <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconos[nombre] || iconos.caja}</svg>;
+}
+function Marca({ compacta = false }) { return <div className="marca"><div className="marca-icono"><Icono nombre="tienda" size={22}/></div>{!compacta && <div className="marca-titulo">Abasto<span>Control</span><small>GESTIÓN COMERCIAL</small></div>}</div>; }
+function Boton({ hijos, children, icono, secundario = false, outline = false, className = '', ...props }) { return <button className={`btn ${secundario ? 'btn-secundario' : ''} ${outline ? 'btn-outline' : ''} ${className}`} {...props}>{icono && <Icono nombre={icono} size={17}/>}<span>{children || hijos}</span></button>; }
+function Vacio({ titulo = 'No hay datos para mostrar', detalle = 'Los resultados aparecerán aquí cuando estén disponibles.', icono = 'vacio' }) { return <div className="vacio"><div className="vacio-icono"><Icono nombre={icono} size={24}/></div><strong>{titulo}</strong><span>{detalle}</span></div>; }
+function Cargando({ texto = 'Cargando información...' }) { return <div className="cargando"><span className="spinner"/>{texto}</div>; }
+function Encabezado({ subtitulo, titulo, accion, icono }) { return <div className="encabezado-seccion"><div><span className="eyebrow">ABASTOCONTROL / {subtitulo?.toUpperCase() || 'GESTIÓN'}</span><h1>{titulo}</h1><p>{subtitulo}</p></div>{accion && <div>{accion}</div>}{icono && <Icono nombre={icono}/>}</div>; }
+function InsigniaEstado({ estado }) { const clase = ['entregado', 'confirmada', 'listo', 'activo'].includes(estado) ? 'exito' : ['cancelado', 'anulada'].includes(estado) ? 'peligro' : ['en_preparacion', 'registrado'].includes(estado) ? 'aviso' : 'neutral'; return <span className={`estado estado-${clase}`}><span className="estado-punto"/>{estados[estado] || estado}</span>; }
+function Modal({ titulo, subtitulo, cerrar, children }) { useEffect(() => { const fn = e => { if (e.key === 'Escape') cerrar(); }; document.addEventListener('keydown', fn); return () => document.removeEventListener('keydown', fn); }, [cerrar]); return <div className="modal-velo" onMouseDown={e => { if (e.target === e.currentTarget) cerrar(); }}><section className="modal" role="dialog" aria-modal="true" aria-label={titulo}><div className="modal-cabecera"><div><h2>{titulo}</h2>{subtitulo && <p>{subtitulo}</p>}</div><button className="boton-icono" onClick={cerrar} aria-label="Cerrar"><Icono nombre="cerrar"/></button></div><div className="modal-contenido">{children}</div></section></div>; }
+function Aviso({ texto, tipo = 'error' }) { return texto ? <p className={`aviso aviso-${tipo}`}><Icono nombre={tipo === 'error' ? 'alerta' : 'check'} size={16}/>{texto}</p> : null; }
+const etiquetaPago = { efectivo: 'Efectivo', yape: 'Yape', plin: 'Plin', fiado: 'Fiado' };
+const inicial = (nombre) => (nombre || 'U').trim().charAt(0).toUpperCase();
+const emojiProducto = (nombre = '') => { const n = nombre.toLowerCase(); if (n.includes('agua')) return '💧'; if (n.includes('aceite')) return '🫒'; if (n.includes('arroz')) return '🍚'; if (n.includes('azúcar')) return '🧂'; if (n.includes('leche')) return '🥛'; if (n.includes('galleta')) return '🍪'; if (n.includes('gaseosa')) return '🥤'; if (n.includes('detergente')) return '🧼'; return '📦'; };
 
 function Login({ alEntrar }) {
-  const [usuario, setUsuario] = useState('');
-  const [contrasena, setContrasena] = useState('');
-  const [error, setError] = useState('');
-
-  async function enviar() {
-    try {
-      const r = await api('/auth/login', { metodo: 'POST', cuerpo: { usuario, contrasena } });
-      guardarToken(r.token);
-      alEntrar(r.usuario);
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  return (
-    <div className="tarjeta login">
-      <h1>AbastoControl</h1>
-      <label>Usuario<input value={usuario} onChange={(e) => setUsuario(e.target.value)} autoComplete="username" /></label>
-      <label>Contraseña<input type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} autoComplete="current-password" /></label>
-      {error && <p className="error">{error}</p>}
-      <button onClick={enviar}>Ingresar</button>
-    </div>
-  );
+  const [usuario, setUsuario] = useState(''); const [contrasena, setContrasena] = useState(''); const [visible, setVisible] = useState(false); const [error, setError] = useState(''); const [ocupado, setOcupado] = useState(false);
+  const entrar = async e => { e.preventDefault(); setError(''); setOcupado(true); try { const r = await api('/auth/login', { metodo: 'POST', cuerpo: { usuario, contrasena } }); guardarToken(r.token); alEntrar(r.usuario); } catch (err) { setError(err.message); } finally { setOcupado(false); } };
+  return <div className="login-pagina"><section className="login-marca"><div className="login-marca-superior"><Marca/><span className="login-tag">PLATAFORMA DE GESTIÓN</span></div><div className="login-mensaje"><span className="login-sello"><Icono nombre="escudo" size={17}/> Gestión inteligente para tu negocio</span><h1>Todo tu negocio.<br/><em>En un solo lugar.</em></h1><p>Controla tus ventas, inventario y pedidos con una herramienta diseñada para trabajar con claridad y confianza.</p><div className="login-beneficios"><div><Icono nombre="check"/> Inventario siempre al día</div><div><Icono nombre="check"/> Ventas en tiempo real</div><div><Icono nombre="check"/> Reportes para decidir mejor</div></div></div><div className="login-grafico"><div className="grafico-decoracion"><span/><span/><span/><span/><span/><span/><span/></div><div className="grafico-etiqueta"><Icono nombre="grafico"/> Información clara. Mejores decisiones.</div></div><p className="login-pie">AbastoControl © 2026 · Plataforma de gestión comercial</p></section><section className="login-panel"><div className="login-marca-movil"><Marca/></div><div className="login-caja"><div className="login-saludo">¡Bienvenido de nuevo! <span>✳</span></div><h2>Inicia sesión</h2><p className="login-subtitulo">Ingresa tus credenciales para acceder a tu espacio de trabajo.</p><form onSubmit={entrar} className="form-login"><label>Usuario<div className="campo-con-icono"><Icono nombre="usuario" size={18}/><input autoFocus required value={usuario} onChange={e=>setUsuario(e.target.value)} placeholder="Tu nombre de usuario" autoComplete="username"/></div></label><label>Contraseña<div className="campo-con-icono"><Icono nombre="llave" size={18}/><input required type={visible ? 'text' : 'password'} value={contrasena} onChange={e=>setContrasena(e.target.value)} placeholder="Ingresa tu contraseña" autoComplete="current-password"/><button className="ver-contrasena" type="button" onClick={()=>setVisible(!visible)} aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Icono nombre={visible ? 'ojoOff' : 'ojo'} size={17}/></button></div></label><Aviso texto={error}/><Boton className="login-entrar" disabled={ocupado}>{ocupado ? 'Ingresando...' : 'Acceder a mi cuenta'}<Icono nombre="flecha" size={18}/></Boton></form><div className="login-seguro"><Icono nombre="escudo" size={17}/><span>Acceso protegido. Tus datos están bajo control.</span></div></div><p className="login-soporte">¿Necesitas ayuda? Contacta al administrador del sistema.</p></section></div>;
 }
 
-function Ventas() {
-  const [productos, setProductos] = useState([]);
-  const [buscar, setBuscar] = useState('');
-  const [carrito, setCarrito] = useState([]);
-  const [medioPago, setMedioPago] = useState('efectivo');
-  const [clienteId, setClienteId] = useState('');
-  const [ticket, setTicket] = useState(null);
-  const [mensaje, setMensaje] = useState('');
-
-  useEffect(() => { api(`/productos?buscar=${encodeURIComponent(buscar)}`).then(setProductos).catch((e) => setMensaje(e.message)); }, [buscar]);
-
-  const agregar = (p) => setCarrito((c) => {
-    const existe = c.find((l) => l.productoId === p.id);
-    return existe
-      ? c.map((l) => (l.productoId === p.id ? { ...l, cantidad: l.cantidad + 1 } : l))
-      : [...c, { productoId: p.id, nombre: p.nombre, precio: p.precioVenta, cantidad: 1 }];
-  });
-  const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0);
-
-  async function confirmar() {
-    setMensaje('');
-    try {
-      const cuerpo = { medioPago, lineas: carrito.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })), clienteId: clienteId || undefined };
-      const venta = await api('/ventas', { metodo: 'POST', cuerpo });
-      setTicket(await api(`/ventas/${venta.id}/ticket`));
-      setCarrito([]);
-    } catch (e) {
-      setMensaje(e.message);
-    }
-  }
-
-  if (ticket) {
-    return (
-      <div className="tarjeta ticket">
-        <h2>Ticket N.º {ticket.numero}</h2>
-        <p>{ticket.fecha} · {ticket.vendedor} · {ticket.medioPago}</p>
-        <ul>{ticket.lineas.map((l) => <li key={l.productoId}>{l.cantidad} × {l.nombre} — {soles(l.subtotal)}</li>)}</ul>
-        <strong>Total: {soles(ticket.total)}</strong>
-        <button onClick={() => setTicket(null)}>Nueva venta</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="dos-columnas">
-      <div className="tarjeta">
-        <h2>Productos</h2>
-        <input placeholder="Buscar por nombre o código" value={buscar} onChange={(e) => setBuscar(e.target.value)} />
-        <ul className="lista">{productos.map((p) => (
-          <li key={p.id}><span>{p.nombre} · {soles(p.precioVenta)} · stock {p.stock}</span><button disabled={p.stock < 1} onClick={() => agregar(p)}>Agregar</button></li>
-        ))}</ul>
-      </div>
-      <div className="tarjeta">
-        <h2>Venta actual</h2>
-        <ul className="lista">{carrito.map((l) => <li key={l.productoId}>{l.cantidad} × {l.nombre} — {soles(l.precio * l.cantidad)}</li>)}</ul>
-        <label>Medio de pago
-          <select value={medioPago} onChange={(e) => setMedioPago(e.target.value)}>
-            <option value="efectivo">Efectivo</option><option value="yape">Yape</option><option value="plin">Plin</option><option value="fiado">Fiado</option>
-          </select>
-        </label>
-        {medioPago === 'fiado' && <label>Id de cliente<input value={clienteId} onChange={(e) => setClienteId(e.target.value)} /></label>}
-        <strong>Total: {soles(total)}</strong>
-        {mensaje && <p className="error">{mensaje}</p>}
-        <button disabled={!carrito.length} onClick={confirmar}>Confirmar venta</button>
-      </div>
-    </div>
-  );
+function Grafico({ filas = [], dias = 7 }) {
+  const porFecha = Object.fromEntries(filas.map(f => [String(f.fecha).slice(0, 10), Number(f.total) || 0]));
+  const barras = Array.from({ length: dias }, (_, i) => { const d = restarDias(dias - i - 1); return { fecha: d, total: porFecha[d] || 0 }; });
+  const max = Math.max(...barras.map(f => f.total), 1);
+  return <div className="grafico-barras"><div className="lineas-fondo"><i/><i/><i/><i/></div>{barras.map(b=><div className="barra-columna" key={b.fecha} title={`${fechaLegible(b.fecha)} · ${dinero(b.total)}`}><div className="barra-exterior"><div className={`barra-interior ${b.total ? '' : 'barra-sin-datos'}`} style={{ height: `${Math.max(4, b.total / max * 100)}%` }}/></div><span>{new Date(`${b.fecha}T12:00:00`).toLocaleDateString('es-PE',{weekday:'short'}).replace('.','')}</span></div>)}</div>;
+}
+function Resumen({ ir, recarga }) {
+  const [datos, setDatos] = useState({ productos: [], alertas: [], ventas: [], pedidos: [], reporte: null }); const [cargando,setCargando] = useState(true); const [error,setError] = useState('');
+  useEffect(() => { let vivo=true; setCargando(true); Promise.allSettled([api('/productos'),api('/productos/alertas'),api('/ventas'),api('/pedidos'),api(`/reportes/ventas?desde=${restarDias(6)}&hasta=${hoyISO()}`)]).then(r=>{if(!vivo)return; const val = i => r[i].status==='fulfilled' ? r[i].value : null; setDatos({productos: val(0)||[],alertas: val(1)||[],ventas:val(2)||[],pedidos:val(3)||[],reporte:val(4)}); setError(r.some(v=>v.status==='rejected')?'Algunos indicadores no pudieron cargarse. Intenta actualizar.':'');setCargando(false);});return()=>{vivo=false;};},[recarga]);
+  const confirmadas = datos.ventas.filter(v=>v.estado==='confirmada'); const ventasHoy = confirmadas.filter(v=>String(v.fecha).startsWith(hoyISO())); const facturacionHoy=ventasHoy.reduce((s,v)=>s+Number(v.total),0); const pedidosPend = datos.pedidos.filter(p=>!['entregado','cancelado'].includes(p.estado));
+  return <div className="contenido-pagina"><div className="bienvenida"><div className="bienvenida-texto"><span className="eyebrow eyebrow-claro">PANEL GENERAL · {new Date().toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'})}</span><h1>Tu negocio, bajo control.</h1><p>Un vistazo a lo que está pasando en tu bodega, en tiempo real.</p><Boton secundario icono="mas" onClick={()=>ir('ventas')}>Registrar una venta</Boton></div><div className="bienvenida-arte" aria-hidden="true"><div className="arte-cuadro arte1"/><div className="arte-cuadro arte2"/><div className="arte-icono"><Icono nombre="tienda" size={66}/></div></div></div><Aviso texto={error}/><div className="kpi-cuadricula"><TarjetaKpi titulo="Ventas de hoy" valor={cargando?'—':String(ventasHoy.length).padStart(2,'0')} descripcion="Operaciones confirmadas" icono="ventas" color="turquesa"/><TarjetaKpi titulo="Ingresos del día" valor={cargando?'—':dinero(facturacionHoy)} descripcion="En ventas confirmadas" icono="reportes" color="violeta"/><TarjetaKpi titulo="Productos activos" valor={cargando?'—':datos.productos.length} descripcion="En el inventario" icono="inventario" color="azul"/><TarjetaKpi titulo="Stock por reponer" valor={cargando?'—':datos.alertas.length} descripcion="Productos en nivel mínimo" icono="alerta" color="naranja"/></div><div className="resumen-dos"><section className="panel bloque-chart"><div className="panel-encabezado"><div><span className="eyebrow">ANÁLISIS DE VENTAS</span><h2>Movimiento de la semana</h2></div><span className="etiqueta-clara">Últimos 7 días</span></div>{cargando?<Cargando/>:<><div className="grafico-total"><span>Facturación semanal</span><strong>{dinero(datos.reporte?.totalGeneral)}</strong></div><Grafico filas={datos.reporte?.filas || []}/></>}</section><section className="panel bloque-alertas"><div className="panel-encabezado"><div><span className="eyebrow">INVENTARIO</span><h2>Atención al stock</h2></div><button className="enlace" onClick={()=>ir('inventario')}>Ver inventario <Icono nombre="flecha" size={16}/></button></div>{cargando?<Cargando/>:datos.alertas.length===0?<Vacio titulo="Todo está al día" detalle="No hay productos en nivel mínimo." icono="check"/>:<div className="lista-alertas">{datos.alertas.slice(0,5).map(p=><div className="alerta-fila" key={p.id}><div className="emoji-producto">{emojiProducto(p.nombre)}</div><div className="alerta-nombre"><strong>{p.nombre}</strong><span>Mínimo recomendado: {p.stockMinimo}</span></div><span className="stock-critico">{p.stock} unid.</span></div>)}</div>}</section></div><div className="resumen-dos resumen-inferior"><section className="panel"><div className="panel-encabezado"><div><span className="eyebrow">ACTIVIDAD RECIENTE</span><h2>Últimas ventas</h2></div><button className="enlace" onClick={()=>ir('ventas')}>Ir a ventas <Icono nombre="flecha" size={16}/></button></div>{cargando?<Cargando/>:datos.ventas.length===0?<Vacio titulo="Todavía no hay ventas" detalle="Cuando registres una venta aparecerá aquí." icono="ventas"/>:<div className="lista-actividad">{datos.ventas.slice(0,4).map(v=><div className="actividad-fila" key={v.id}><div className="actividad-icono"><Icono nombre="ventas" size={18}/></div><div><strong>Venta #{String(v.id).padStart(4,'0')}</strong><span>{fechaLegible(v.fecha)} · {etiquetaPago[v.medioPago]||v.medioPago}</span></div><div className="actividad-derecha"><strong>{dinero(v.total)}</strong><InsigniaEstado estado={v.estado}/></div></div>)}</div>}</section><section className="panel acciones-panel"><div className="panel-encabezado"><div><span className="eyebrow">ACCESO RÁPIDO</span><h2>¿Qué deseas hacer?</h2></div></div><div className="accesos"><button onClick={()=>ir('ventas')}><span className="acceso-icono acceso-verde"><Icono nombre="ventas"/></span><span><strong>Nueva venta</strong><small>Registrar una operación</small></span><Icono nombre="chevron" size={17}/></button><button onClick={()=>ir('inventario')}><span className="acceso-icono acceso-azul"><Icono nombre="inventario"/></span><span><strong>Consultar inventario</strong><small>Revisar stock y productos</small></span><Icono nombre="chevron" size={17}/></button><button onClick={()=>ir('pedidos')}><span className="acceso-icono acceso-violeta"><Icono nombre="pedidos"/></span><span><strong>Gestionar pedidos</strong><small>{pedidosPend.length} pendientes</small></span><Icono nombre="chevron" size={17}/></button></div></section></div></div>;
+}
+function TarjetaKpi({ titulo, valor, descripcion, icono, color }) { return <div className="kpi panel"><div className="kpi-arriba"><span>{titulo}</span><div className={`kpi-icono kpi-${color}`}><Icono nombre={icono} size={20}/></div></div><strong>{valor}</strong><small>{descripcion}</small></div>; }
+function Ventas({ notificar }) {
+  const [productos,setProductos]=useState([]);const [buscar,setBuscar]=useState('');const [carrito,setCarrito]=useState([]);const [pago,setPago]=useState('efectivo');const [clientes,setClientes]=useState([]);const [clienteId,setClienteId]=useState('');const [ticket,setTicket]=useState(null);const [cargando,setCargando]=useState(true);const [guardando,setGuardando]=useState(false);const [error,setError]=useState('');
+  const cargar=async()=>{try{setCargando(true);setProductos(await api('/productos'));setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};
+  useEffect(()=>{cargar();api('/clientes').then(setClientes).catch(()=>{});},[]);
+  const vistos=useMemo(()=>productos.filter(p=>`${p.nombre} ${p.codigo}`.toLowerCase().includes(buscar.toLowerCase())),[productos,buscar]);
+  const total=carrito.reduce((s,l)=>s+Number(l.precio)*l.cantidad,0);const unidades=carrito.reduce((s,l)=>s+l.cantidad,0);
+  const modificar=(producto,cantidad)=>setCarrito(lista=>{const actual=lista.find(l=>l.productoId===producto.id);const nuevo=(actual?.cantidad||0)+cantidad;if(nuevo<=0)return lista.filter(l=>l.productoId!==producto.id);if(nuevo>Number(producto.stock)){notificar('No hay suficiente stock disponible.','error');return lista;}return actual?lista.map(l=>l.productoId===producto.id?{...l,cantidad:nuevo}:l):[...lista,{productoId:producto.id,nombre:producto.nombre,precio:Number(producto.precioVenta),cantidad:1}];});
+  const confirmar=async()=>{if(!carrito.length||guardando)return;setGuardando(true);setError('');try{const venta=await api('/ventas',{metodo:'POST',cuerpo:{medioPago:pago,clienteId:pago==='fiado'?clienteId:undefined,lineas:carrito.map(l=>({productoId:l.productoId,cantidad:l.cantidad}))}});const comprobante=await api(`/ventas/${venta.id}/ticket`);setTicket(comprobante);setCarrito([]);await cargar();notificar('Venta registrada correctamente.','exito');}catch(e){setError(e.message);}finally{setGuardando(false);}};
+  if(ticket)return <div className="contenido-pagina"><Encabezado titulo="Venta registrada" subtitulo="El comprobante se ha generado correctamente." accion={<Boton icono="mas" onClick={()=>setTicket(null)}>Nueva venta</Boton>}/><div className="ticket-externo panel"><div className="ticket-sello"><Icono nombre="check" size={30}/></div><h2>¡Venta completada!</h2><p>La operación quedó registrada y el inventario fue actualizado.</p><div className="ticket-papel"><div className="ticket-marca"><Marca/><span>COMPROBANTE</span></div><div className="ticket-meta"><div><small>N.º de ticket</small><strong>#{String(ticket.numero).padStart(5,'0')}</strong></div><div><small>Fecha</small><strong>{fechaLegible(ticket.fecha)}</strong></div><div><small>Atendido por</small><strong>{ticket.vendedor}</strong></div><div><small>Medio de pago</small><strong>{etiquetaPago[ticket.medioPago]||ticket.medioPago}</strong></div></div><div className="ticket-productos">{ticket.lineas.map((l,i)=><div key={`${l.productoId}-${i}`}><span>{l.cantidad} × {l.nombre}</span><strong>{dinero(l.subtotal)}</strong></div>)}</div><div className="ticket-total"><span>Total pagado</span><strong>{dinero(ticket.total)}</strong></div></div><div className="ticket-botones"><Boton secundario icono="imprimir" onClick={()=>window.print()}>Imprimir</Boton><Boton icono="mas" onClick={()=>setTicket(null)}>Nueva venta</Boton></div></div></div>;
+  return <div className="contenido-pagina"><Encabezado titulo="Punto de venta" subtitulo="Registra ventas de forma rápida y mantén el stock actualizado."/><div className="ventas-layout"><section className="panel ventas-catalogo"><div className="panel-encabezado"><div><span className="eyebrow">CATÁLOGO</span><h2>Seleccionar productos</h2></div><span className="etiqueta-clara">{vistos.length} productos</span></div><div className="campo-busqueda"><Icono nombre="lupa"/><input aria-label="Buscar productos" value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar por nombre o código..."/></div><Aviso texto={error}/>{cargando?<Cargando/>:vistos.length===0?<Vacio titulo="Sin coincidencias" detalle="Prueba con otro nombre o código." icono="lupa"/>:<div className="catalogo-lista">{vistos.map(p=>{const cant=carrito.find(l=>l.productoId===p.id)?.cantidad||0;return <div className="catalogo-producto" key={p.id}><div className="producto-emoji">{emojiProducto(p.nombre)}</div><div className="producto-datos"><strong>{p.nombre}</strong><small>{p.codigo} · {p.categoria}</small><span className={`stock-texto ${p.stock<=p.stockMinimo?'stock-bajo':''}`}>{p.stock} disponibles</span></div><div className="producto-precio"><strong>{dinero(p.precioVenta)}</strong>{cant>0?<div className="selector-cantidad"><button aria-label={`Quitar ${p.nombre}`} onClick={()=>modificar(p,-1)}><Icono nombre="menos" size={14}/></button><b>{cant}</b><button aria-label={`Agregar ${p.nombre}`} disabled={cant>=p.stock} onClick={()=>modificar(p,1)}><Icono nombre="mas" size={14}/></button></div>:<button className="btn-producto" disabled={p.stock<1} onClick={()=>modificar(p,1)}><Icono nombre="mas" size={15}/> Agregar</button>}</div></div>;})}</div>}</section><section className="panel carrito-panel"><div className="panel-encabezado"><div><span className="eyebrow">CAJA</span><h2>Resumen de venta</h2></div><div className="carrito-contador">{unidades}</div></div>{carrito.length===0?<Vacio titulo="Tu carrito está vacío" detalle="Selecciona productos del catálogo para comenzar una nueva venta." icono="ventas"/>:<div className="carrito-lineas">{carrito.map(l=><div className="carrito-linea" key={l.productoId}><div><strong>{l.nombre}</strong><small>{l.cantidad} × {dinero(l.precio)}</small></div><strong>{dinero(l.precio*l.cantidad)}</strong></div>)}<button className="enlace enlace-borrar" onClick={()=>setCarrito([])}><Icono nombre="papelera" size={15}/> Vaciar carrito</button></div>}<div className="carrito-fondo"><label className="campo-label">Medio de pago<select value={pago} onChange={e=>setPago(e.target.value)}><option value="efectivo">Efectivo</option><option value="yape">Yape</option><option value="plin">Plin</option><option value="fiado">Fiado</option></select></label>{pago==='fiado'&&<label className="campo-label">Cliente<select required value={clienteId} onChange={e=>setClienteId(e.target.value)}><option value="">Selecciona un cliente</option>{clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label>}<div className="carrito-resumen"><div><span>Productos</span><strong>{unidades}</strong></div><div><span>Subtotal</span><strong>{dinero(total)}</strong></div><div className="carrito-total"><span>Total a pagar</span><strong>{dinero(total)}</strong></div></div><Boton icono="check" className="btn-ancho" disabled={!carrito.length||guardando||(pago==='fiado'&&!clienteId)} onClick={confirmar}>{guardando?'Procesando venta...':'Confirmar venta'}</Boton><p className="carrito-nota"><Icono nombre="escudo" size={14}/> La venta se guardará en la base de datos.</p></div></section></div></div>;
 }
 
-function Inventario() {
-  const [alertas, setAlertas] = useState([]);
-  const [productos, setProductos] = useState([]);
-  useEffect(() => {
-    api('/productos/alertas').then(setAlertas).catch(() => {});
-    api('/productos').then(setProductos).catch(() => {});
-  }, []);
-  return (
-    <div className="dos-columnas">
-      <div className="tarjeta">
-        <h2>Alertas de stock mínimo</h2>
-        {alertas.length === 0 ? <p>No hay productos bajo el mínimo.</p> : (
-          <ul className="lista">{alertas.map((p) => <li key={p.id}>{p.nombre}: {p.stock} (mínimo {p.stockMinimo})</li>)}</ul>
-        )}
-      </div>
-      <div className="tarjeta">
-        <h2>Productos</h2>
-        <ul className="lista">{productos.map((p) => <li key={p.id}>{p.codigo} · {p.nombre} · stock {p.stock}</li>)}</ul>
-      </div>
-    </div>
-  );
+function Inventario({ usuario, notificar }) {
+  const [productos,setProductos]=useState([]);const [alertas,setAlertas]=useState([]);const [buscar,setBuscar]=useState('');const [filtro,setFiltro]=useState('todos');const [editando,setEditando]=useState(null);const [cargando,setCargando]=useState(true);const [error,setError]=useState('');
+  const cargar=async()=>{setCargando(true);try{const [a,b]=await Promise.all([api('/productos'),api('/productos/alertas')]);setProductos(a);setAlertas(b);setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};
+  useEffect(()=>{cargar();},[]);
+  const lista=useMemo(()=>productos.filter(p=>`${p.nombre} ${p.codigo} ${p.categoria}`.toLowerCase().includes(buscar.toLowerCase())&&(filtro==='todos'||(filtro==='bajo'?p.stock<=p.stockMinimo:p.stock>p.stockMinimo))),[productos,buscar,filtro]);
+  const categorias=Array.from(new Map(productos.map(p=>[p.categoriaId,{id:p.categoriaId,nombre:p.categoria}])).values());
+  const valor=productos.reduce((s,p)=>s+Number(p.stock)*Number(p.costo),0);
+  return <div className="contenido-pagina"><Encabezado titulo="Inventario" subtitulo="Consulta existencias, controla precios y evita quiebres de stock." accion={usuario.rol==='admin'&&<Boton icono="mas" onClick={()=>setEditando({})}>Nuevo producto</Boton>}/><div className="mini-kpis"><TarjetaKpi titulo="Productos activos" valor={productos.length} descripcion="Referencias disponibles" icono="inventario" color="azul"/><TarjetaKpi titulo="Stock bajo" valor={alertas.length} descripcion="Requieren atención" icono="alerta" color="naranja"/><TarjetaKpi titulo="Unidades en stock" valor={productos.reduce((s,p)=>s+Number(p.stock),0)} descripcion="Entre todos los productos" icono="caja" color="turquesa"/><TarjetaKpi titulo="Valor del inventario" valor={dinero(valor)} descripcion="Según costo registrado" icono="reportes" color="violeta"/></div><section className="panel tabla-panel"><div className="panel-encabezado"><div><span className="eyebrow">CONTROL DE PRODUCTOS</span><h2>Listado general</h2></div><button className="boton-icono" aria-label="Actualizar productos" onClick={cargar}><Icono nombre="recargar"/></button></div><div className="tabla-filtros"><div className="campo-busqueda"><Icono nombre="lupa"/><input placeholder="Buscar productos, código o categoría..." value={buscar} onChange={e=>setBuscar(e.target.value)}/></div><select aria-label="Filtrar por stock" value={filtro} onChange={e=>setFiltro(e.target.value)}><option value="todos">Todos los productos</option><option value="bajo">Stock bajo</option><option value="normal">Stock normal</option></select></div><Aviso texto={error}/>{cargando?<Cargando/>:lista.length===0?<Vacio titulo="No hay productos para mostrar" detalle="Cambia los filtros o registra un nuevo producto."/>:<div className="tabla-scroll"><table className="tabla-datos"><thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Existencias</th><th>Estado</th>{usuario.rol==='admin'&&<th></th>}</tr></thead><tbody>{lista.map(p=><tr key={p.id}><td><div className="celda-producto"><span className="tabla-emoji">{emojiProducto(p.nombre)}</span><span><strong>{p.nombre}</strong><small>{p.codigo}</small></span></div></td><td>{p.categoria}</td><td className="numero-negrita">{dinero(p.precioVenta)}</td><td><strong>{p.stock} unid.</strong></td><td><span className={`estado estado-${p.stock<=p.stockMinimo?'peligro':'exito'}`}><span className="estado-punto"/>{p.stock<=p.stockMinimo?'Stock bajo':'Disponible'}</span></td>{usuario.rol==='admin'&&<td><button className="boton-icono" aria-label={`Editar ${p.nombre}`} onClick={()=>setEditando(p)}><Icono nombre="editar" size={17}/></button></td>}</tr>)}</tbody></table></div>}<div className="tabla-pie">Mostrando {lista.length} de {productos.length} productos</div></section>{editando&&<FormularioProducto producto={editando} categorias={categorias} cerrar={()=>setEditando(null)} guardar={async data=>{if(editando.id){await api(`/productos/${editando.id}`,{metodo:'PUT',cuerpo:data});notificar('Producto actualizado.','exito');}else{await api('/productos',{metodo:'POST',cuerpo:data});notificar('Producto registrado.','exito');}setEditando(null);await cargar();}}/>}</div>;
+}
+function FormularioProducto({producto,categorias,cerrar,guardar}) {
+  const [form,setForm]=useState({codigo:producto.codigo||'',nombre:producto.nombre||'',categoriaId:String(producto.categoriaId||categorias[0]?.id||''),precioVenta:producto.precioVenta??'',costo:producto.costo??0,stock:producto.stock??0,stockMinimo:producto.stockMinimo??0,fechaVencimiento:producto.fechaVencimiento?.slice(0,10)||''});const [error,setError]=useState('');const [ocupado,setOcupado]=useState(false);
+  const campo=(nombre,valor)=>setForm(f=>({...f,[nombre]:valor}));const enviar=async(e)=>{e.preventDefault();setOcupado(true);setError('');try{await guardar({...form,categoriaId:Number(form.categoriaId),precioVenta:Number(form.precioVenta),costo:Number(form.costo),stock:Number(form.stock),stockMinimo:Number(form.stockMinimo),fechaVencimiento:form.fechaVencimiento||null});}catch(err){setError(err.message);}finally{setOcupado(false);}};
+  return <Modal titulo={producto.id?'Editar producto':'Nuevo producto'} subtitulo="Los cambios se guardarán en el inventario." cerrar={cerrar}><form className="form-grid" onSubmit={enviar}><label className="campo-label">Nombre del producto<input required value={form.nombre} onChange={e=>campo('nombre',e.target.value)}/></label><label className="campo-label">Código / SKU<input required value={form.codigo} onChange={e=>campo('codigo',e.target.value)}/></label><label className="campo-label">Categoría<select required value={form.categoriaId} onChange={e=>campo('categoriaId',e.target.value)}><option value="">Selecciona categoría</option>{categorias.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}</select></label><label className="campo-label">Precio de venta (S/)<input type="number" required min="0.01" step="0.01" value={form.precioVenta} onChange={e=>campo('precioVenta',e.target.value)}/></label><label className="campo-label">Costo unitario (S/)<input type="number" required min="0" step="0.01" value={form.costo} onChange={e=>campo('costo',e.target.value)}/></label><label className="campo-label">Stock actual<input type="number" required min="0" step="1" value={form.stock} onChange={e=>campo('stock',e.target.value)}/></label><label className="campo-label">Stock mínimo<input type="number" required min="0" step="1" value={form.stockMinimo} onChange={e=>campo('stockMinimo',e.target.value)}/></label><label className="campo-label">Vencimiento (opcional)<input type="date" value={form.fechaVencimiento} onChange={e=>campo('fechaVencimiento',e.target.value)}/></label><div className="form-ancho"><Aviso texto={error}/><div className="form-acciones"><Boton secundario type="button" onClick={cerrar}>Cancelar</Boton><Boton disabled={ocupado||!categorias.length} type="submit">{ocupado?'Guardando...':'Guardar producto'}</Boton></div>{!categorias.length&&<small>No hay categorías disponibles. Primero importa las categorías desde la base de datos.</small>}</div></form></Modal>;
 }
 
-function Pedidos() {
-  const [pedidos, setPedidos] = useState([]);
-  const cargar = () => api('/pedidos').then(setPedidos).catch(() => {});
-  useEffect(() => { cargar(); }, []);
-  const avanzar = async (id) => { await api(`/pedidos/${id}/avanzar`, { metodo: 'PATCH' }).catch(() => {}); cargar(); };
-  return (
-    <div className="tarjeta">
-      <h2>Pedidos</h2>
-      <ul className="lista">{pedidos.map((p) => (
-        <li key={p.id}><span>#{p.id} · {p.cliente} · {p.modalidad} · <b>{p.estado}</b></span>
-          {p.estado !== 'entregado' && p.estado !== 'cancelado' && <button onClick={() => avanzar(p.id)}>Avanzar</button>}
-        </li>
-      ))}</ul>
-    </div>
-  );
+function Pedidos({ notificar }) {
+  const [pedidos,setPedidos]=useState([]);const [clientes,setClientes]=useState([]);const [filtro,setFiltro]=useState('todos');const [modal,setModal]=useState(false);const [cargando,setCargando]=useState(true);const [error,setError]=useState('');const [procesando,setProcesando]=useState(null);
+  const cargar=async()=>{setCargando(true);try{const [a,b]=await Promise.all([api('/pedidos'),api('/clientes')]);setPedidos(a);setClientes(b);setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};
+  useEffect(()=>{cargar();},[]);
+  const visibles=pedidos.filter(p=>filtro==='todos'||p.estado===filtro);const pendientes=pedidos.filter(p=>!['cancelado','entregado'].includes(p.estado)).length;
+  const cambiar=async(p,tipo)=>{setProcesando(p.id);try{await api(`/pedidos/${p.id}/${tipo}`,{metodo:'PATCH'});notificar(tipo==='avanzar'?'Pedido actualizado.':'Pedido cancelado.','exito');await cargar();}catch(e){setError(e.message);}finally{setProcesando(null);}};
+  return <div className="contenido-pagina"><Encabezado titulo="Pedidos" subtitulo="Organiza cada solicitud, desde su registro hasta la entrega." accion={<Boton icono="mas" onClick={()=>setModal(true)}>Nuevo pedido</Boton>}/><div className="mini-kpis mini-kpis-tres"><TarjetaKpi titulo="Pedidos totales" valor={pedidos.length} descripcion="Registros del sistema" icono="pedidos" color="azul"/><TarjetaKpi titulo="En proceso" valor={pendientes} descripcion="Pendientes de finalizar" icono="reloj" color="naranja"/><TarjetaKpi titulo="Entregados" valor={pedidos.filter(p=>p.estado==='entregado').length} descripcion="Pedidos completados" icono="check" color="turquesa"/></div><section className="panel tabla-panel"><div className="panel-encabezado"><div><span className="eyebrow">GESTIÓN DE SOLICITUDES</span><h2>Seguimiento de pedidos</h2></div><button className="boton-icono" onClick={cargar} aria-label="Actualizar pedidos"><Icono nombre="recargar"/></button></div><div className="tabla-filtros"><div className="pildoras">{[['todos','Todos'],['registrado','Registrados'],['en_preparacion','En preparación'],['listo','Listos'],['entregado','Entregados']].map(([id,label])=><button key={id} className={filtro===id?'pildora activa':'pildora'} onClick={()=>setFiltro(id)}>{label}</button>)}</div></div><Aviso texto={error}/>{cargando?<Cargando/>:visibles.length===0?<Vacio titulo="No hay pedidos en esta categoría" detalle="Crea un pedido nuevo o cambia el filtro." icono="pedidos"/>:<div className="tabla-scroll"><table className="tabla-datos"><thead><tr><th>Pedido</th><th>Cliente</th><th>Modalidad</th><th>Fecha</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>{visibles.map(p=><tr key={p.id}><td className="numero-negrita">#{String(p.id).padStart(4,'0')}</td><td>{p.cliente||`Cliente #${p.clienteId}`}</td><td>{p.modalidad==='reparto'?'Reparto':'Recojo en tienda'}</td><td>{fechaLegible(p.fechaCreacion)}</td><td><InsigniaEstado estado={p.estado}/></td><td><div className="fila-botones">{!['entregado','cancelado'].includes(p.estado)&&<><button className="btn-accion" disabled={procesando===p.id} onClick={()=>cambiar(p,'avanzar')}>Avanzar <Icono nombre="flecha" size={14}/></button><button className="boton-icono boton-peligro" disabled={procesando===p.id} onClick={()=>{if(window.confirm(`¿Cancelar el pedido #${p.id}?`))cambiar(p,'cancelar');}} aria-label={`Cancelar pedido ${p.id}`}><Icono nombre="cerrar" size={16}/></button></>}</div></td></tr>)}</tbody></table></div>}<div className="tabla-pie">{visibles.length} pedidos visibles</div></section>{modal&&<CrearPedido clientes={clientes} cerrar={()=>setModal(false)} guardar={async datos=>{await api('/pedidos',{metodo:'POST',cuerpo:datos});notificar('Pedido registrado.','exito');setModal(false);cargar();}}/>}</div>;
 }
-
-function Reportes() {
-  const hoy = new Date().toLocaleDateString('en-CA');
-  const [desde, setDesde] = useState(hoy.slice(0, 8) + '01');
-  const [hasta, setHasta] = useState(hoy);
-  const [datos, setDatos] = useState(null);
-  const [error, setError] = useState('');
-  async function consultar() {
-    setError('');
-    try { setDatos(await api(`/reportes/ventas?desde=${desde}&hasta=${hasta}`)); } catch (e) { setError(e.message); }
-  }
-  return (
-    <div className="tarjeta">
-      <h2>Reporte de ventas</h2>
-      <div className="fila">
-        <label>Desde<input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} /></label>
-        <label>Hasta<input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} /></label>
-        <button onClick={consultar}>Consultar</button>
-      </div>
-      {error && <p className="error">{error}</p>}
-      {datos && (
-        <>
-          <ul className="lista">{datos.filas.map((f) => <li key={f.fecha}>{f.fecha}: {f.cantidad} ventas · {soles(f.total)}</li>)}</ul>
-          <strong>Total del periodo: {soles(datos.totalGeneral)}</strong>
-        </>
-      )}
-    </div>
-  );
+function CrearPedido({clientes,cerrar,guardar}){const[clienteId,setClienteId]=useState('');const[modalidad,setModalidad]=useState('recojo');const[notas,setNotas]=useState('');const[error,setError]=useState('');const[ocupado,setOcupado]=useState(false);return <Modal titulo="Nuevo pedido" subtitulo="Completa los datos para registrar una solicitud." cerrar={cerrar}><form onSubmit={async e=>{e.preventDefault();setOcupado(true);setError('');try{await guardar({clienteId:Number(clienteId),modalidad,notas});}catch(err){setError(err.message);}finally{setOcupado(false);}}} className="form-col"><label className="campo-label">Cliente<select required value={clienteId} onChange={e=>setClienteId(e.target.value)}><option value="">Seleccionar cliente</option>{clientes.map(c=><option value={c.id} key={c.id}>{c.nombre}</option>)}</select></label><label className="campo-label">Modalidad<select value={modalidad} onChange={e=>setModalidad(e.target.value)}><option value="recojo">Recojo en tienda</option><option value="reparto">Reparto a domicilio</option></select></label><label className="campo-label">Notas (opcional)<textarea maxLength={255} rows={4} value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Indicaciones adicionales..."/></label><Aviso texto={error}/><div className="form-acciones"><Boton secundario type="button" onClick={cerrar}>Cancelar</Boton><Boton disabled={ocupado||!clienteId} type="submit">{ocupado?'Guardando...':'Registrar pedido'}</Boton></div></form></Modal>}
+function Reportes({ usuario, notificar }) {
+  const [desde,setDesde]=useState(inicioMes());const [hasta,setHasta]=useState(hoyISO());const [datos,setDatos]=useState(null);const [masVendidos,setMasVendidos]=useState([]);const [inventario,setInventario]=useState(null);const [error,setError]=useState('');const [cargando,setCargando]=useState(false);const [descargando,setDescargando]=useState(false);
+  const consultar=async()=>{setCargando(true);setError('');try{const promesas=[api(`/reportes/ventas?desde=${desde}&hasta=${hasta}`)];if(usuario.rol==='admin'){promesas.push(api(`/reportes/mas-vendidos?desde=${desde}&hasta=${hasta}&limite=5`));promesas.push(api('/reportes/inventario'));}const r=await Promise.all(promesas);setDatos(r[0]);setMasVendidos(r[1]?.filas||[]);setInventario(r[2]||null);}catch(e){setError(e.message);}finally{setCargando(false);}};
+  useEffect(()=>{consultar();},[]);
+  const exportar=async(tipo)=>{setDescargando(true);setError('');try{const respuesta=await fetch(`/api/reportes/exportar/${tipo}${tipo==='ventas'?`?desde=${desde}&hasta=${hasta}`:''}`,{headers:{Authorization:`Bearer ${obtenerToken()}`}});if(!respuesta.ok){const d=await respuesta.json().catch(()=>({}));throw new Error(d.error||'No se pudo descargar el reporte');}const blob=await respuesta.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`abastocontrol-${tipo}-${hoyISO()}.csv`;document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);notificar('Reporte CSV descargado.','exito');}catch(e){setError(e.message);}finally{setDescargando(false);}};
+  const cantidad=datos?.filas?.reduce((s,f)=>s+Number(f.cantidad),0)||0;const promedio=cantidad?Number(datos.totalGeneral)/cantidad:0;
+  return <div className="contenido-pagina"><Encabezado titulo="Reportes y análisis" subtitulo="Convierte las operaciones de tu bodega en decisiones informadas." accion={usuario.rol==='admin'&&<Boton secundario icono="descargar" disabled={descargando||!datos} onClick={()=>exportar('ventas')}>Exportar ventas CSV</Boton>}/><section className="panel filtro-reporte"><div className="reporte-texto"><span className="eyebrow">PERIODO DE ANÁLISIS</span><strong>Filtrar información</strong></div><label className="campo-label">Desde<input type="date" value={desde} onChange={e=>setDesde(e.target.value)}/></label><label className="campo-label">Hasta<input type="date" value={hasta} onChange={e=>setHasta(e.target.value)}/></label><Boton icono="lupa" onClick={consultar} disabled={cargando||!desde||!hasta||desde>hasta}>{cargando?'Consultando...':'Consultar'}</Boton></section><Aviso texto={error}/><div className="mini-kpis mini-kpis-tres"><TarjetaKpi titulo="Ventas del periodo" valor={datos?cantidad:'—'} descripcion="Operaciones registradas" icono="ventas" color="azul"/><TarjetaKpi titulo="Ingresos del periodo" valor={datos?dinero(datos.totalGeneral):'—'} descripcion="Ventas confirmadas" icono="reportes" color="turquesa"/><TarjetaKpi titulo="Ticket promedio" valor={datos?dinero(promedio):'—'} descripcion="Ingreso medio por venta" icono="grafico" color="violeta"/></div><div className="resumen-dos"><section className="panel"><div className="panel-encabezado"><div><span className="eyebrow">EVOLUCIÓN</span><h2>Ventas por día</h2></div><span className="etiqueta-clara">{fechaLegible(desde)} — {fechaLegible(hasta)}</span></div>{cargando?<Cargando/>:!datos?.filas?.length?<Vacio titulo="Sin ventas en este periodo" detalle="Prueba con otro rango de fechas." icono="reportes"/>:<div className="tabla-scroll"><table className="tabla-datos tabla-compacta"><thead><tr><th>Fecha</th><th>N.º de ventas</th><th className="texto-derecha">Monto total</th></tr></thead><tbody>{datos.filas.map((f,i)=><tr key={`${f.fecha}-${i}`}><td>{fechaLegible(f.fecha)}</td><td>{f.cantidad}</td><td className="texto-derecha numero-negrita">{dinero(f.total)}</td></tr>)}</tbody><tfoot><tr><td>Total</td><td>{cantidad}</td><td className="texto-derecha">{dinero(datos.totalGeneral)}</td></tr></tfoot></table></div>}</section><section className="panel"><div className="panel-encabezado"><div><span className="eyebrow">RANKING DE PRODUCTOS</span><h2>Más vendidos</h2></div></div>{usuario.rol!=='admin'?<Vacio titulo="Acceso de administrador" detalle="Este reporte requiere permisos de administración." icono="escudo"/>:cargando?<Cargando/>:masVendidos.length===0?<Vacio titulo="Sin productos vendidos" detalle="No se registraron productos en este periodo." icono="caja"/>:<div className="ranking-lista">{masVendidos.map((p,i)=>{const max=Math.max(...masVendidos.map(v=>v.unidades),1);return <div className="ranking-fila" key={p.codigo}><span className="ranking-numero">{String(i+1).padStart(2,'0')}</span><div className="ranking-centro"><div><strong>{p.nombre}</strong><small>{p.unidades} unidades</small></div><div className="ranking-fondo"><div style={{width:`${p.unidades/max*100}%`}}/></div></div><strong>{dinero(p.monto)}</strong></div>})}</div>}</section></div>{usuario.rol==='admin'&&<section className="panel reporte-inventario"><div><span className="eyebrow">VALORIZACIÓN DE MERCADERÍA</span><h2>Valor del inventario</h2><p>Valor estimado según el costo unitario registrado en MySQL.</p></div><div className="reporte-valor"><strong>{inventario?dinero(inventario.valorTotal):'—'}</strong><Boton secundario icono="descargar" disabled={descargando||!inventario} onClick={()=>exportar('inventario')}>Descargar CSV</Boton></div></section>}</div>;
 }
+function Clientes({ notificar }) {
+  const [clientes,setClientes]=useState([]);const [buscar,setBuscar]=useState('');const [modal,setModal]=useState(false);const [cargando,setCargando]=useState(true);const [error,setError]=useState('');const cargar=async()=>{setCargando(true);try{setClientes(await api('/clientes'));setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};useEffect(()=>{cargar();},[]);
+  const visibles=clientes.filter(c=>`${c.nombre} ${c.telefono||''}`.toLowerCase().includes(buscar.toLowerCase()));
+  return <div className="contenido-pagina"><Encabezado titulo="Clientes" subtitulo="Mantén organizada la información de quienes confían en tu negocio." accion={<Boton icono="mas" onClick={()=>setModal(true)}>Nuevo cliente</Boton>}/><section className="panel tabla-panel"><div className="panel-encabezado"><div><span className="eyebrow">DIRECTORIO</span><h2>Lista de clientes</h2></div><span className="etiqueta-clara">{clientes.length} registrados</span></div><div className="tabla-filtros"><div className="campo-busqueda"><Icono nombre="lupa"/><input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar por nombre o teléfono..."/></div></div><Aviso texto={error}/>{cargando?<Cargando/>:visibles.length===0?<Vacio titulo="Sin clientes para mostrar" detalle="Registra tu primer cliente o ajusta la búsqueda." icono="clientes"/>:<div className="tabla-scroll"><table className="tabla-datos"><thead><tr><th>Cliente</th><th>Teléfono</th><th>Saldo fiado</th><th>Estado</th></tr></thead><tbody>{visibles.map(c=><tr key={c.id}><td><div className="celda-producto"><span className="avatar-tabla">{inicial(c.nombre)}</span><span><strong>{c.nombre}</strong><small>Cliente #{c.id}</small></span></div></td><td>{c.telefono||'No registrado'}</td><td className="numero-negrita">{dinero(c.saldoFiado)}</td><td><span className="estado estado-exito"><span className="estado-punto"/>Registrado</span></td></tr>)}</tbody></table></div>}</section>{modal&&<CrearCliente cerrar={()=>setModal(false)} guardar={async c=>{await api('/clientes',{metodo:'POST',cuerpo:c});setModal(false);notificar('Cliente creado correctamente.','exito');cargar();}}/>}</div>;
+}
+function CrearCliente({cerrar,guardar}){const[nombre,setNombre]=useState('');const[telefono,setTelefono]=useState('');const[consentimiento,setConsentimiento]=useState(false);const[error,setError]=useState('');const[ocupado,setOcupado]=useState(false);return <Modal titulo="Nuevo cliente" subtitulo="Registra los datos básicos con consentimiento." cerrar={cerrar}><form className="form-col" onSubmit={async e=>{e.preventDefault();setOcupado(true);setError('');try{await guardar({nombre,telefono,consentimientoDatos:consentimiento});}catch(err){setError(err.message);}finally{setOcupado(false);}}}><label className="campo-label">Nombre completo<input required maxLength="100" value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Nombre del cliente"/></label><label className="campo-label">Teléfono (opcional)<input maxLength="20" value={telefono} onChange={e=>setTelefono(e.target.value)} placeholder="Número de contacto"/></label><label className="check-label"><input type="checkbox" checked={consentimiento} onChange={e=>setConsentimiento(e.target.checked)}/> Confirmo que el cliente autorizó el registro de sus datos personales.</label><Aviso texto={error}/><div className="form-acciones"><Boton secundario type="button" onClick={cerrar}>Cancelar</Boton><Boton type="submit" disabled={!consentimiento||ocupado}>{ocupado?'Guardando...':'Guardar cliente'}</Boton></div></form></Modal>}
+function Proveedores({ usuario, notificar }) {
+  const [proveedores,setProveedores]=useState([]);const [buscar,setBuscar]=useState('');const [modal,setModal]=useState(false);const [cargando,setCargando]=useState(true);const [error,setError]=useState('');const cargar=async()=>{setCargando(true);try{setProveedores(await api('/proveedores'));setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};useEffect(()=>{cargar();},[]);
+  const visibles=proveedores.filter(p=>`${p.nombre} ${p.telefono||''}`.toLowerCase().includes(buscar.toLowerCase()));return <div className="contenido-pagina"><Encabezado titulo="Proveedores" subtitulo="Organiza los contactos de abastecimiento de tu negocio." accion={usuario.rol==='admin'&&<Boton icono="mas" onClick={()=>setModal(true)}>Nuevo proveedor</Boton>}/><section className="panel tabla-panel"><div className="panel-encabezado"><div><span className="eyebrow">ABASTECIMIENTO</span><h2>Directorio de proveedores</h2></div><span className="etiqueta-clara">{proveedores.length} proveedores</span></div><div className="tabla-filtros"><div className="campo-busqueda"><Icono nombre="lupa"/><input value={buscar} onChange={e=>setBuscar(e.target.value)} placeholder="Buscar proveedor..."/></div></div><Aviso texto={error}/>{cargando?<Cargando/>:visibles.length===0?<Vacio titulo="No hay proveedores" detalle="Registra un proveedor para gestionar compras." icono="proveedores"/>:<div className="tabla-scroll"><table className="tabla-datos"><thead><tr><th>Proveedor</th><th>Teléfono</th><th>Estado</th></tr></thead><tbody>{visibles.map(p=><tr key={p.id}><td><div className="celda-producto"><span className="tabla-emoji"><Icono nombre="proveedores" size={19}/></span><span><strong>{p.nombre}</strong><small>Proveedor #{p.id}</small></span></div></td><td>{p.telefono||'No registrado'}</td><td><InsigniaEstado estado={p.activo?'activo':'inactivo'}/></td></tr>)}</tbody></table></div>}</section>{modal&&<CrearProveedor cerrar={()=>setModal(false)} guardar={async datos=>{await api('/proveedores',{metodo:'POST',cuerpo:datos});setModal(false);notificar('Proveedor creado.','exito');cargar();}}/>}</div>;
+}
+function CrearProveedor({cerrar,guardar}){const[nombre,setNombre]=useState('');const[telefono,setTelefono]=useState('');const[error,setError]=useState('');const[ocupado,setOcupado]=useState(false);return <Modal titulo="Nuevo proveedor" subtitulo="Agrega una empresa a tu directorio." cerrar={cerrar}><form className="form-col" onSubmit={async e=>{e.preventDefault();setOcupado(true);setError('');try{await guardar({nombre,telefono});}catch(err){setError(err.message);}finally{setOcupado(false);}}}><label className="campo-label">Razón social / Nombre<input required value={nombre} onChange={e=>setNombre(e.target.value)}/></label><label className="campo-label">Teléfono (opcional)<input value={telefono} onChange={e=>setTelefono(e.target.value)}/></label><Aviso texto={error}/><div className="form-acciones"><Boton secundario type="button" onClick={cerrar}>Cancelar</Boton><Boton type="submit" disabled={ocupado}>{ocupado?'Guardando...':'Guardar proveedor'}</Boton></div></form></Modal>}
+function Compras({ notificar }){
+  const [compras,setCompras]=useState([]);const [proveedores,setProveedores]=useState([]);const [productos,setProductos]=useState([]);const [modal,setModal]=useState(false);const [cargando,setCargando]=useState(true);const [error,setError]=useState('');const cargar=async()=>{setCargando(true);try{const [a,b,c]=await Promise.all([api('/compras'),api('/proveedores'),api('/productos')]);setCompras(a);setProveedores(b);setProductos(c);setError('');}catch(e){setError(e.message);}finally{setCargando(false);}};useEffect(()=>{cargar();},[]);
+  return <div className="contenido-pagina"><Encabezado titulo="Compras" subtitulo="Registra el ingreso de mercadería y mantén actualizado el inventario." accion={<Boton icono="mas" onClick={()=>setModal(true)}>Nueva compra</Boton>}/><section className="panel tabla-panel"><div className="panel-encabezado"><div><span className="eyebrow">ABASTECIMIENTO</span><h2>Historial de compras</h2></div><span className="etiqueta-clara">{compras.length} operaciones</span></div><Aviso texto={error}/>{cargando?<Cargando/>:compras.length===0?<Vacio titulo="Aún no hay compras" detalle="Registra el ingreso de mercadería para comenzar." icono="compras"/>:<div className="tabla-scroll"><table className="tabla-datos"><thead><tr><th>Compra</th><th>Proveedor</th><th>Fecha</th><th>Total</th></tr></thead><tbody>{compras.map(c=><tr key={c.id}><td className="numero-negrita">#{String(c.id).padStart(4,'0')}</td><td>{c.proveedor||c.proveedorNombre||`Proveedor #${c.proveedorId}`}</td><td>{fechaLegible(c.fecha)}</td><td className="numero-negrita">{dinero(c.total)}</td></tr>)}</tbody></table></div>}</section>{modal&&<CrearCompra proveedores={proveedores} productos={productos} cerrar={()=>setModal(false)} guardar={async datos=>{await api('/compras',{metodo:'POST',cuerpo:datos});setModal(false);notificar('Compra registrada. El stock fue actualizado.','exito');cargar();}}/>}</div>;
+}
+function CrearCompra({proveedores,productos,cerrar,guardar}){const[proveedorId,setProveedorId]=useState('');const[productoId,setProductoId]=useState('');const[cantidad,setCantidad]=useState(1);const[costo,setCosto]=useState('');const[lineas,setLineas]=useState([]);const[error,setError]=useState('');const[ocupado,setOcupado]=useState(false);const agregar=()=>{const p=productos.find(x=>x.id===Number(productoId));if(!p||Number(cantidad)<1||Number(costo)<=0)return setError('Selecciona un producto, cantidad válida y costo mayor a cero.');if(lineas.some(l=>l.productoId===p.id))return setError('Ese producto ya está agregado.');setLineas([...lineas,{productoId:p.id,nombre:p.nombre,cantidad:Number(cantidad),costoUnitario:Number(costo)}]);setProductoId('');setCantidad(1);setCosto('');setError('');};const total=lineas.reduce((s,l)=>s+l.cantidad*l.costoUnitario,0);return <Modal titulo="Ingreso de mercadería" subtitulo="Registra una compra y suma las unidades al stock." cerrar={cerrar}><form className="form-col" onSubmit={async e=>{e.preventDefault();setOcupado(true);setError('');try{await guardar({proveedorId:Number(proveedorId),lineas:lineas.map(({productoId,cantidad,costoUnitario})=>({productoId,cantidad,costoUnitario}))});}catch(err){setError(err.message);}finally{setOcupado(false);}}}><label className="campo-label">Proveedor<select required value={proveedorId} onChange={e=>setProveedorId(e.target.value)}><option value="">Selecciona un proveedor</option>{proveedores.filter(p=>p.activo).map(p=><option value={p.id} key={p.id}>{p.nombre}</option>)}</select></label><div className="form-grid grid-compra"><label className="campo-label">Producto<select value={productoId} onChange={e=>{setProductoId(e.target.value);setCosto(String(productos.find(p=>p.id===Number(e.target.value))?.costo||''));}}><option value="">Seleccionar</option>{productos.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}</select></label><label className="campo-label">Cantidad<input type="number" min="1" step="1" value={cantidad} onChange={e=>setCantidad(e.target.value)}/></label><label className="campo-label">Costo unit. (S/)<input type="number" min="0.01" step="0.01" value={costo} onChange={e=>setCosto(e.target.value)}/></label></div><Boton outline type="button" icono="mas" onClick={agregar}>Agregar producto</Boton><div className="lineas-compra">{lineas.length===0?<p className="texto-ayuda">Agrega al menos un producto a esta compra.</p>:lineas.map(l=><div key={l.productoId}><span>{l.cantidad} × {l.nombre}</span><strong>{dinero(l.cantidad*l.costoUnitario)}</strong><button type="button" className="boton-icono" onClick={()=>setLineas(lineas.filter(x=>x.productoId!==l.productoId))} aria-label="Quitar producto"><Icono nombre="cerrar" size={16}/></button></div>)}</div><div className="total-compra">Total: <strong>{dinero(total)}</strong></div><Aviso texto={error}/><div className="form-acciones"><Boton secundario type="button" onClick={cerrar}>Cancelar</Boton><Boton type="submit" disabled={ocupado||!proveedorId||!lineas.length}>{ocupado?'Registrando...':'Registrar compra'}</Boton></div></form></Modal>}
 
-export default function App() {
-  const [usuario, setUsuario] = useState(null);
-  const [vista, setVista] = useState('ventas');
-
-  useEffect(() => {
-    if (obtenerToken()) api('/auth/yo').then((u) => setUsuario({ id: u.id, nombre: u.nombre, rol: u.rol })).catch(() => guardarToken(null));
-  }, []);
-
-  if (!usuario) return <Login alEntrar={setUsuario} />;
-  const salir = () => { guardarToken(null); setUsuario(null); };
-  const vistas = { ventas: <Ventas />, inventario: <Inventario />, pedidos: <Pedidos />, reportes: <Reportes /> };
-  return (
-    <div className="app">
-      <header>
-        <strong>AbastoControl</strong>
-        <nav>
-          {Object.keys(vistas).map((v) => <button key={v} className={v === vista ? 'activo' : ''} onClick={() => setVista(v)}>{v}</button>)}
-        </nav>
-        <span>{usuario.nombre} ({usuario.rol}) <button onClick={salir}>Salir</button></span>
-      </header>
-      <main>{vistas[vista]}</main>
-    </div>
-  );
+const navegacion=[{id:'resumen',nombre:'Panel principal',icono:'inicio',grupo:'GENERAL'},{id:'ventas',nombre:'Punto de venta',icono:'ventas',grupo:'GESTIÓN'},{id:'inventario',nombre:'Inventario',icono:'inventario'},{id:'pedidos',nombre:'Pedidos',icono:'pedidos'},{id:'compras',nombre:'Compras',icono:'compras'},{id:'clientes',nombre:'Clientes',icono:'clientes',grupo:'ADMINISTRACIÓN'},{id:'proveedores',nombre:'Proveedores',icono:'proveedores'},{id:'reportes',nombre:'Reportes',icono:'reportes'}];
+export default function App(){
+  const[usuario,setUsuario]=useState(null);const[autenticando,setAutenticando]=useState(!!obtenerToken());const[vista,setVista]=useState('resumen');const[menuMovil,setMenuMovil]=useState(false);const[toast,setToast]=useState(null);const[actualizacion,setActualizacion]=useState(0);
+  useEffect(()=>{let vivo=true;if(obtenerToken())api('/auth/yo').then(u=>{if(vivo)setUsuario({id:u.id,nombre:u.nombre,rol:u.rol});}).catch(()=>guardarToken(null)).finally(()=>{if(vivo)setAutenticando(false);});return()=>{vivo=false;};},[]);
+  useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(null),4600);return()=>clearTimeout(t);},[toast]);
+  const notificar=(mensaje,tipo='exito')=>setToast({mensaje,tipo,fecha:Date.now()});
+  const ir=(destino)=>{setVista(destino);setMenuMovil(false);window.scrollTo({top:0,behavior:'smooth'});};
+  const salir=()=>{guardarToken(null);setUsuario(null);setVista('resumen');};
+  if(autenticando)return <div className="cargando-pagina"><Marca/><Cargando texto="Preparando tu espacio de trabajo..."/></div>;
+  if(!usuario)return <Login alEntrar={u=>{setUsuario(u);setVista('resumen');}}/>;
+  const titulo=navegacion.find(n=>n.id===vista)?.nombre||'Panel principal';
+  const paginas={resumen:<Resumen ir={ir} recarga={actualizacion}/>,ventas:<Ventas notificar={notificar}/>,inventario:<Inventario usuario={usuario} notificar={notificar}/>,pedidos:<Pedidos notificar={notificar}/>,compras:<Compras notificar={notificar}/>,clientes:<Clientes notificar={notificar}/>,proveedores:<Proveedores usuario={usuario} notificar={notificar}/>,reportes:<Reportes usuario={usuario} notificar={notificar}/>};
+  return <div className="aplicacion"><div className={`sidebar-capa ${menuMovil?'abierta':''}`} onClick={()=>setMenuMovil(false)}/><aside className={`sidebar ${menuMovil?'sidebar-abierto':''}`}><div className="sidebar-marca"><Marca/><button className="sidebar-cerrar" onClick={()=>setMenuMovil(false)} aria-label="Cerrar menú"><Icono nombre="cerrar"/></button></div><div className="sidebar-sede"><div className="sede-emblema"><Icono nombre="tienda" size={18}/></div><div><strong>El Abasto Andino</strong><span>Espacio de trabajo</span></div><Icono nombre="abajo" size={15}/></div><nav aria-label="Navegación principal" className="sidebar-navegacion">{navegacion.map((n,i)=><div key={n.id}>{n.grupo&&<div className="nav-grupo">{n.grupo}</div>}<button className={`nav-opcion ${vista===n.id?'nav-activo':''}`} onClick={()=>ir(n.id)}><Icono nombre={n.icono} size={19}/><span>{n.nombre}</span>{vista===n.id&&<span className="nav-indicador"/>}</button></div>)}</nav><div className="sidebar-abajo"><div className="ayuda-caja"><div className="ayuda-icono"><Icono nombre="escudo" size={19}/></div><strong>Tu información segura</strong><p>Trabaja con tu sistema de gestión y sus datos actualizados.</p></div><div className="sidebar-version">AbastoControl · v2.0 interfaz</div></div></aside><div className="zona-principal"><header className="topbar"><div className="topbar-izquierda"><button className="boton-icono boton-menu" onClick={()=>setMenuMovil(true)} aria-label="Abrir menú"><Icono nombre="menu"/></button><div className="migas"><span>Mi espacio</span><Icono nombre="chevron" size={14}/><strong>{titulo}</strong></div></div><div className="topbar-derecha"><span className="conexion"><span/> Sistema local</span><button className="boton-icono topbar-refresh" title="Actualizar panel" onClick={()=>setActualizacion(v=>v+1)}><Icono nombre="recargar" size={18}/></button><div className="topbar-divisor"/><span className="perfil-avatar">{inicial(usuario.nombre)}</span><div className="perfil-texto"><strong>{usuario.nombre}</strong><small>{usuario.rol==='admin'?'Administrador':'Vendedor'}</small></div><button className="boton-salir" title="Cerrar sesión" onClick={salir} aria-label="Cerrar sesión"><Icono nombre="salir" size={18}/></button></div></header><main className="main-contenedor" key={vista}>{paginas[vista]}</main><footer className="pie-app"><span>© 2026 AbastoControl · Sistema de gestión comercial</span><span>Diseñado para una gestión más simple</span></footer></div>{toast&&<div className={`toast toast-${toast.tipo}`} key={toast.fecha}><div className="toast-icono"><Icono nombre={toast.tipo==='error'?'alerta':'check'} size={19}/></div><span>{toast.mensaje}</span><button onClick={()=>setToast(null)} aria-label="Cerrar notificación"><Icono nombre="cerrar" size={16}/></button></div>}</div>;
 }
